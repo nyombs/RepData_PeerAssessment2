@@ -1,0 +1,194 @@
+---
+title: "Natural Events and their impact on US Population Health and Economy"
+author: "Stéphane Nyombayire"
+date: "June 16th, 2015"
+output: html_document
+---
+  
+##Synopsis
+  
+  The study aims to identify the most harmful weather events for the Health of USA Population and Economy. At the base of the analysis is the U.S. National Oceanic and Atmospheric Admistration's (NOAA) storm database, that tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+
+Original data and documentation (quoted from the project assignment):
+
+• [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) [47Mb]
+
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.
+
+• National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+
+• National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+
+## Data Processing
+
+Loading data:
+```{r, echo=TRUE, cache=TRUE}
+stormData<-read.csv(bzfile("repdata-data-StormData.csv.bz2"), header = TRUE, sep = ",")
+```
+
+
+A brief summary of the data:
+```{r, echo=TRUE}
+str(stormData)
+```
+
+The data is comprised of 902297 rows and 37 columns.
+
+##Analysis
+
+We are esentially trying to answer two main questions:
+  
+  1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+2. Across the United States, which types of events have the greatest economic consequences?
+
+
+To answer question 1, we need to look at all events that generated Fatalities and Injuries.
+
+
+To answer question 2, we need to look at all events that generated both Property and Crop damages.
+
+
+
+## Results: Question 1
+
+
+A view of the total number of Injuries and Fatalies by Event.
+
+
+We'll calculate and plot the Top 20 events that generated the most fatalities and injuries to date. We'll look at injuries vs. fatalities, as well as the sum of both.
+
+```{r, echo=TRUE, cache=TRUE}
+library(plyr)
+maxFatalities <- ddply(stormData, ~EVTYPE, summarize, FatalMAx = max(FATALITIES))
+maxFatalities <- maxFatalities[maxFatalities$FatalMAx > 0,]
+maxFatalities <- maxFatalities[order(-maxFatalities$FatalMAx),]
+maxFatalities[1:5,]
+
+maxInjuries <- ddply(stormData, ~EVTYPE, summarize, InjuryMAx = max(INJURIES))
+maxInjuries <- maxInjuries[maxInjuries$InjuryMAx > 0,]
+maxInjuries <- maxInjuries[order(-maxInjuries$InjuryMAx),]
+maxInjuries[1:5,]
+
+```
+
+Comparative charts:
+  
+```{r, echo = TRUE, fig.height=8, fig.width=16}
+library(portfolio)
+par(mfrow = c(1,2))
+par(mar = c(15, 4, 4, 2))
+map.market(id = stormData$REFNUM, area = stormData$FATALITIES, group = stormData$EVTYPE, color = stormData$FATALITIES, main = "National Weather Service: Fatalities" )
+
+map.market(id = stormData$REFNUM, area = stormData$INJURIES, group = stormData$EVTYPE, color = stormData$INJURIES, main = "National Weather Service: Injuries" )
+
+```
+
+
+
+The Top 3 most harmful natural events for US inhabitants are (area of the tiles): 
+  
+  * for fatalities: Tornado, Excessive Heat and Flash Flood. Important to note that Heat had the most casuality for a single event with 583 fatalities (Visually this is how green the tile is). In the top 5 most fatal events, Heat related events occupy 4 places
+
+* for injuries: Tornado, Tstm Wind and Flood. In the top 5 most injury prone single events, ICE Storm are  second behind Tornadoes. 
+
+It is also worthy to note that the scale of injuries is of an order of magnitude higher than the fatalities scale (Tornado: 91346 injuries vs. 5633 fatalities)
+
+
+## Results: Question 2 
+
+Before we can proceed with the identification of top most damaging events, we need to realign the value of damages, as they are expressed in many different ways.
+
+The columns of importance are:
+  
+  * for property damage: PROPDMG, PROPDMGEXP
+
+* for crop damage: CROPDMG, CROPDMGEXP
+
+To align and measure all damages correctly, we'll create 2 new variables that will contain the correct values.
+
+```{r, echo=TRUE, cache=TRUE}
+
+## values of PROPDMGEXP: - ? + 0 1 2 3 4 5 6 7 8 B h H K m M
+
+##initializing the new variable with 0 will take care of the -, ?, and + values that we do not know how to deal with; and of 0 value
+stormData$PROPDMGVAL <- 0 
+
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "B"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "B"] * 10^9
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "m" | stormData$PROPDMGEXP == "M"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "m" | stormData$PROPDMGEXP == "M"] * 10^6
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "K"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "K"] * 10^3
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "h" | stormData$PROPDMGEXP == "H"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "h" | stormData$PROPDMGEXP == "H"] * 10^2
+
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "1"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "1"] * 10^1
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "2"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "2"] * 10^2
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "3"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "3"] * 10^3
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "4"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "4"] * 10^4
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "5"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "5"] * 10^5
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "6"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "6"] * 10^6
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "7"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "7"] * 10^7
+stormData$PROPDMGVAL[stormData$PROPDMGEXP == "8"] <- stormData$PROPDMG[stormData$PROPDMGEXP == "8"] * 10^8
+
+##do the same for CROPDMGEXP's values: ? 0 2 B k K m M
+
+stormData$CROPDMGVAL <- 0
+stormData$CROPDMGVAL[stormData$CROPDMGEXP == "B"] <- stormData$CROPDMG[stormData$CROPDMGEXP == "B"] * 10^9
+stormData$CROPDMGVAL[stormData$CROPDMGEXP == "m"| stormData$CROPDMGEXP == "M"] <- stormData$CROPDMG[stormData$CROPDMGEXP == "m"| stormData$CROPDMGEXP == "M"] * 10^6
+stormData$CROPDMGVAL[stormData$CROPDMGEXP == "k" | stormData$CROPDMGEXP == "K"] <- stormData$CROPDMG[stormData$CROPDMGEXP == "k" | stormData$CROPDMGEXP == "K"] * 10^3
+stormData$CROPDMGVAL[stormData$CROPDMGEXP == "2"] <- stormData$CROPDMG[stormData$CROPDMGEXP == "2"] * 10^2
+```
+
+
+We're going to group the data by event type, calculating the cumulative value of damages per event.
+
+
+```{r, echo=TRUE}
+library(plyr)
+maxPropDmg <- ddply(stormData, ~EVTYPE, summarize, PropDmgMAx = max(PROPDMGVAL))
+maxPropDmg <- maxPropDmg[maxPropDmg$PropDmgMAx > 0,]
+maxPropDmg <- maxPropDmg[order(-maxPropDmg$PropDmgMAx),]
+maxPropDmg[1:5,]
+
+maxCropDmg <- ddply(stormData, ~EVTYPE, summarize, CropDmgMAx = max(CROPDMGVAL))
+maxCropDmg <- maxCropDmg[maxCropDmg$CropDmgMAx > 0,]
+maxCropDmg <- maxCropDmg[order(-maxCropDmg$CropDmgMAx),]
+maxCropDmg[1:5,]
+
+propDmg <-  ddply(stormData, ~EVTYPE, summarize, totalPropDmg = sum(PROPDMGVAL))
+propDmg <- propDmg[order(-propDmg$totalPropDmg), ]
+propDmgTop20<-propDmg[1:20, ]
+
+cropDmg <-  ddply(stormData, ~EVTYPE, summarize, totalCropDmg = sum(CROPDMGVAL))
+cropDmg <- cropDmg[order(-cropDmg$totalCropDmg), ]
+cropDmgTop20<-cropDmg[1:20, ]
+
+```
+
+
+A visual representation of the two sets of most damaging events:
+```{r, echo=TRUE, fig.height=8, fig.width = 16}
+par(mfrow = c(1,2))
+par(mar = c(25, 4, 4, 2))
+barplot(propDmgTop20$totalPropDmg/10^6, names.arg = propDmgTop20$EVTYPE, col = "blue", las = 3, main = "Top 20 events generating property damage", ylab = "Cost (in milions)")
+barplot(cropDmgTop20$totalCropDmg/10^6, names.arg = cropDmgTop20$EVTYPE, col = "red", las = 3, main = "Top 20 events generating crop damage", ylab = "Cost (in milions)")
+```
+
+as well as a look at the top of the two data sets
+```{r, echo=TRUE}
+head(propDmgTop20)
+head(cropDmgTop20)
+```
+
+
+shows that the Top 3 most harmful events for the US Economy are:
+
+* property damaging: Flood, Hurricane / Typhoon, Tornado. Flood the most expensive single event impacting property
+
+* crop damaging:Drought, Flood and River Flood. Important to call out the most expensive single event impacting crops are ICE Storm & River Flood
+
+
+Looking at the data sets, we can easily see that Tornadoes are in the Top 3 for both human life fatalities / injuries and property damages. Another top event is Flood, which is one of the top reason for damages in both property and crop damages, as well as human fatalities / injuries. 
